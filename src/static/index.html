@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Risk Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+/* ── Reset & Base ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #0a0e17;
+  --bg-card: #111827;
+  --bg-hover: #1a2332;
+  --bg-elevated: #1e2a3a;
+  --border: #1f2937;
+  --border-light: #374151;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #00d4aa;
+  --accent-dim: rgba(0, 212, 170, 0.15);
+  --green: #00c896;
+  --red: #ff4757;
+  --amber: #ffa502;
+  --blue: #3b82f6;
+  --gold: #ffd700;
+  --silver: #c0c0c0;
+  --bronze: #cd7f32;
+  --profile-low: #00c896;
+  --profile-medium: #3b82f6;
+  --profile-high: #ff8c00;
+  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.4);
+}
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Custom Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+.header {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0,212,170,0.03) 0%, transparent 100%);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-title h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.header-title .logo {
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--bg-base);
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,200,150,0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(0,200,150,0); }
+}
+
+/* ── Stats Cards ───────────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  transition: border-color 0.2s;
+}
+
+.stat-card:hover { border-color: var(--border-light); }
+
+.stat-card .label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.stat-card .value {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-card .sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+/* ── Profile Selector ──────────────────────────────────────────────────── */
+.profile-section {
+  margin: 1.25rem 0;
+}
+
+.profile-section .section-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.profile-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.profile-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 180px;
+}
+
+.profile-tab:hover { border-color: var(--border-light); background: var(--bg-hover); }
+
+.profile-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.profile-tab .tab-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.profile-tab.active .tab-name { color: var(--accent); }
+
+.profile-tab .tab-desc {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.profile-tab .weight-pills {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-top: 0.15rem;
+}
+
+.weight-pill {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+}
+
+/* ── Rankings Table ────────────────────────────────────────────────────── */
+.table-section {
+  margin: 1.25rem 0 2rem;
+}
+
+.table-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.table-header-bar h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.table-header-bar .count {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.table-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+thead { position: sticky; top: 0; z-index: 2; }
+
+thead th {
+  background: var(--bg-elevated);
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+thead th:hover { color: var(--text-secondary); }
+
+thead th.sorted { color: var(--accent); }
+
+thead th .sort-arrow {
+  display: inline-block;
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+thead th:hover .sort-arrow { opacity: 0.5; }
+thead th.sorted .sort-arrow { opacity: 1; }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+tbody tr:nth-child(even) { background: rgba(255,255,255,0.01); }
+tbody tr:hover { background: var(--bg-hover); }
+
+tbody td {
+  padding: 0.6rem 1rem;
+  white-space: nowrap;
+}
+
+td.mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* Rank badges */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.rank-1 { background: rgba(255,215,0,0.15); color: var(--gold); }
+.rank-2 { background: rgba(192,192,192,0.15); color: var(--silver); }
+.rank-3 { background: rgba(205,127,50,0.15); color: var(--bronze); }
+.rank-default {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+/* Ticker cell */
+.ticker-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+/* Score bar */
+.score-cell { min-width: 160px; }
+
+.score-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.score-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.8rem;
+  min-width: 42px;
+  text-align: right;
+}
+
+/* Color classes */
+.text-green { color: var(--green); }
+.text-red { color: var(--red); }
+.text-amber { color: var(--amber); }
+.text-muted { color: var(--text-muted); }
+
+/* ── Skeleton Loading ──────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-elevated) 50%, var(--bg-hover) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-text { height: 1rem; width: 60%; margin: 0.3rem 0; }
+.skeleton-lg { height: 2rem; width: 40%; }
+.skeleton-row { height: 2.5rem; width: 100%; margin: 0.25rem 0; }
+
+/* ── Slide-in Detail Panel ─────────────────────────────────────────────── */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.panel-backdrop.open { opacity: 1; pointer-events: auto; }
+
+.detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  z-index: 101;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-panel.open { transform: translateX(0); }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-header h2 {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.panel-close {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all 0.15s;
+}
+
+.panel-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.panel-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.panel-metric {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+}
+
+.panel-metric .pm-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.panel-metric .pm-value {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.panel-chart-section {
+  margin-top: 1rem;
+}
+
+.panel-chart-section h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.chart-container {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  position: relative;
+  height: 200px;
+}
+
+.panel-scores-list {
+  margin-top: 1.25rem;
+}
+
+.panel-scores-list h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.25rem;
+}
+
+.score-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+
+.score-row .sr-profile {
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.score-row .sr-values {
+  display: flex;
+  gap: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.score-row .sr-rank {
+  color: var(--text-muted);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .profile-tabs { flex-direction: column; }
+  .profile-tab { min-width: unset; }
+  .detail-panel { width: 100vw; max-width: 100vw; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .header-inner { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="container header-inner">
+    <div class="header-title">
+      <div class="logo">R</div>
+      <h1>Stock Risk Engine</h1>
+    </div>
+    <div class="header-meta">
+      <span id="data-date">Loading...</span>
+      <span class="pulse"></span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Stats Cards ─────────────────────────────────────────────────────── -->
+<section class="container">
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+      <div class="label">Avg Return</div>
+      <div class="value" id="stat-return"><span class="skeleton skeleton-lg">&nbsp;</span></div>
+      <div class="sub">annualized</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Volatility</div>
+      <div class="value" id="stat-vol"><span class="skeleton skeleton-lg">&nbsp;</span></div>
+      <div class="sub">std deviation</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Max Drawdown</div>
+      <div class="value" id="stat-dd"><span class="skeleton skeleton-lg">&nbsp;</span></div>
+      <div class="sub">peak to trough</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Tickers</div>
+      <div class="value" id="stat-tickers"><span class="skeleton skeleton-lg">&nbsp;</span></div>
+      <div class="sub">in universe</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Profile Selector ────────────────────────────────────────────────── -->
+<section class="container profile-section">
+  <div class="section-label">Risk Profile</div>
+  <div class="profile-tabs" id="profile-tabs">
+    <!-- Populated by JS -->
+  </div>
+</section>
+
+<!-- ── Rankings Table ──────────────────────────────────────────────────── -->
+<section class="container table-section">
+  <div class="table-header-bar">
+    <h2>Rankings</h2>
+    <span class="count" id="table-count"></span>
+  </div>
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr id="table-head">
+            <th data-key="rank" class="sorted">Rank <span class="sort-arrow">&#9650;</span></th>
+            <th data-key="ticker">Ticker <span class="sort-arrow">&#9650;</span></th>
+            <th data-key="normalized_score">Score <span class="sort-arrow">&#9650;</span></th>
+            <th data-key="annualized_return">Return <span class="sort-arrow">&#9650;</span></th>
+            <th data-key="volatility">Volatility <span class="sort-arrow">&#9650;</span></th>
+            <th data-key="max_drawdown">Max DD <span class="sort-arrow">&#9650;</span></th>
+            <th data-key="momentum">Momentum <span class="sort-arrow">&#9650;</span></th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- Skeleton rows -->
+          <tr><td colspan="7"><div class="skeleton skeleton-row"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton skeleton-row"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton skeleton-row"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton skeleton-row"></div></td></tr>
+          <tr><td colspan="7"><div class="skeleton skeleton-row"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── Detail Panel ────────────────────────────────────────────────────── -->
+<div class="panel-backdrop" id="panel-backdrop"></div>
+<div class="detail-panel" id="detail-panel">
+  <div class="panel-header">
+    <h2 id="panel-ticker">-</h2>
+    <button class="panel-close" id="panel-close">&times;</button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-metrics" id="panel-metrics">
+      <!-- Populated by JS -->
+    </div>
+    <div class="panel-chart-section">
+      <h3>Scores by Profile</h3>
+      <div class="chart-container">
+        <canvas id="score-chart"></canvas>
+      </div>
+    </div>
+    <div class="panel-scores-list" id="panel-scores-list">
+      <h3>Profile Details</h3>
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── State ──────────────────────────────────────────────────────────────── */
+const state = {
+  health: null,
+  profiles: [],
+  activeProfile: 'medium',
+  rankings: null,
+  sortKey: 'rank',
+  sortAsc: true,
+  selectedTicker: null,
+  chartInstance: null,
+};
+
+/* ── API Layer ──────────────────────────────────────────────────────────── */
+const api = {
+  async health() {
+    const r = await fetch('/health');
+    if (!r.ok) throw new Error('Health check failed');
+    return r.json();
+  },
+  async profiles() {
+    const r = await fetch('/profiles');
+    if (!r.ok) throw new Error('Profiles fetch failed');
+    return r.json();
+  },
+  async rankings(profile, topN = 500) {
+    const r = await fetch(`/rankings?risk_profile=${profile}&top_n=${topN}`);
+    if (!r.ok) throw new Error('Rankings fetch failed');
+    return r.json();
+  },
+  async stock(ticker) {
+    const r = await fetch(`/stock/${ticker}`);
+    if (!r.ok) throw new Error(`Stock ${ticker} not found`);
+    return r.json();
+  },
+};
+
+/* ── Formatters ────────────────────────────────────────────────────────── */
+function fmtPct(v) {
+  if (v == null) return '--';
+  const pct = (v * 100).toFixed(1);
+  return (v >= 0 ? '+' : '') + pct + '%';
+}
+
+function fmtScore(v) {
+  if (v == null) return '--';
+  return v.toFixed(3);
+}
+
+function colorClass(v) {
+  if (v == null || v === 0) return 'text-muted';
+  return v > 0 ? 'text-green' : 'text-red';
+}
+
+function scoreBarColor(score) {
+  // 0 = red, 0.5 = amber, 1 = green
+  if (score < 0.35) return 'var(--red)';
+  if (score < 0.65) return 'var(--amber)';
+  return 'var(--green)';
+}
+
+function scoreGradient(score) {
+  if (score < 0.35) return `linear-gradient(90deg, var(--red), #ff6b6b)`;
+  if (score < 0.65) return `linear-gradient(90deg, var(--amber), #ffcc02)`;
+  return `linear-gradient(90deg, var(--green), #00ffaa)`;
+}
+
+function formatDate(d) {
+  if (!d) return '--';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function profileColor(name) {
+  const map = { low: 'var(--profile-low)', medium: 'var(--profile-medium)', high: 'var(--profile-high)' };
+  return map[name] || 'var(--text-secondary)';
+}
+
+/* ── Render: Header Date ───────────────────────────────────────────────── */
+function renderDate() {
+  const el = document.getElementById('data-date');
+  if (state.health && state.health.latest_scores_date) {
+    el.textContent = 'Data as of ' + formatDate(state.health.latest_scores_date);
+  } else {
+    el.textContent = 'No data available';
+  }
+}
+
+/* ── Render: Stats Cards ───────────────────────────────────────────────── */
+function renderStats() {
+  const stocks = state.rankings ? state.rankings.stocks : [];
+
+  if (stocks.length === 0) {
+    document.getElementById('stat-return').textContent = '--';
+    document.getElementById('stat-vol').textContent = '--';
+    document.getElementById('stat-dd').textContent = '--';
+    document.getElementById('stat-tickers').textContent = state.health ? state.health.ticker_count : '--';
+    return;
+  }
+
+  const avgReturn = stocks.reduce((s, r) => s + r.annualized_return, 0) / stocks.length;
+  const avgVol = stocks.reduce((s, r) => s + r.volatility, 0) / stocks.length;
+  const avgDD = stocks.reduce((s, r) => s + r.max_drawdown, 0) / stocks.length;
+
+  const retEl = document.getElementById('stat-return');
+  retEl.textContent = fmtPct(avgReturn);
+  retEl.className = 'value ' + colorClass(avgReturn);
+
+  const volEl = document.getElementById('stat-vol');
+  volEl.textContent = (avgVol * 100).toFixed(1) + '%';
+  volEl.className = 'value';
+
+  const ddEl = document.getElementById('stat-dd');
+  ddEl.textContent = fmtPct(avgDD);
+  ddEl.className = 'value text-red';
+
+  document.getElementById('stat-tickers').textContent =
+    state.health ? state.health.ticker_count : stocks.length;
+}
+
+/* ── Render: Profile Tabs ──────────────────────────────────────────────── */
+function renderProfiles() {
+  const container = document.getElementById('profile-tabs');
+  const greekLabels = { alpha: '\u03b1', beta: '\u03b2', gamma: '\u03b3', delta: '\u03b4' };
+
+  container.innerHTML = state.profiles.map(p => {
+    const isActive = p.name === state.activeProfile;
+    const pills = Object.entries(p.weights)
+      .map(([k, v]) => `<span class="weight-pill">${greekLabels[k] || k}${v}</span>`)
+      .join('');
+
+    return `
+      <div class="profile-tab ${isActive ? 'active' : ''}" data-profile="${p.name}">
+        <span class="tab-name" style="color: ${isActive ? profileColor(p.name) : ''}">${p.name}</span>
+        <span class="tab-desc">${p.description}</span>
+        <div class="weight-pills">${pills}</div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.profile-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const profile = tab.dataset.profile;
+      if (profile !== state.activeProfile) {
+        state.activeProfile = profile;
+        renderProfiles();
+        loadRankings();
+      }
+    });
+  });
+}
+
+/* ── Render: Rankings Table ────────────────────────────────────────────── */
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  const countEl = document.getElementById('table-count');
+
+  if (!state.rankings || state.rankings.stocks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted)">No data available</td></tr>';
+    countEl.textContent = '';
+    return;
+  }
+
+  let stocks = [...state.rankings.stocks];
+
+  // Sort
+  stocks.sort((a, b) => {
+    let va = a[state.sortKey];
+    let vb = b[state.sortKey];
+    if (typeof va === 'string') {
+      va = va.toLowerCase();
+      vb = vb.toLowerCase();
+      return state.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    return state.sortAsc ? va - vb : vb - va;
+  });
+
+  countEl.textContent = stocks.length + ' stocks';
+
+  tbody.innerHTML = stocks.map(s => {
+    const rankBadge = s.rank <= 3
+      ? `<span class="rank-badge rank-${s.rank}">${s.rank}</span>`
+      : `<span class="rank-default">${s.rank}</span>`;
+
+    const barPct = Math.max(0, Math.min(100, s.normalized_score * 100));
+
+    return `
+      <tr data-ticker="${s.ticker}">
+        <td>${rankBadge}</td>
+        <td><span class="ticker-name">${s.ticker}</span></td>
+        <td class="score-cell">
+          <div class="score-bar-wrap">
+            <div class="score-bar-track">
+              <div class="score-bar-fill" style="width:${barPct}%;background:${scoreGradient(s.normalized_score)}"></div>
+            </div>
+            <span class="score-value">${fmtScore(s.normalized_score)}</span>
+          </div>
+        </td>
+        <td class="mono ${colorClass(s.annualized_return)}">${fmtPct(s.annualized_return)}</td>
+        <td class="mono">${(s.volatility * 100).toFixed(1)}%</td>
+        <td class="mono text-red">${fmtPct(s.max_drawdown)}</td>
+        <td class="mono ${colorClass(s.momentum)}">${fmtPct(s.momentum)}</td>
+      </tr>`;
+  }).join('');
+
+  // Row click → open detail
+  tbody.querySelectorAll('tr[data-ticker]').forEach(row => {
+    row.addEventListener('click', () => openDetail(row.dataset.ticker));
+  });
+
+  // Update sort header styles
+  document.querySelectorAll('#table-head th').forEach(th => {
+    const key = th.dataset.key;
+    th.classList.toggle('sorted', key === state.sortKey);
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) {
+      arrow.innerHTML = key === state.sortKey
+        ? (state.sortAsc ? '&#9650;' : '&#9660;')
+        : '&#9650;';
+    }
+  });
+}
+
+function renderTableSkeleton() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = Array(8).fill(0).map(() =>
+    '<tr><td colspan="7"><div class="skeleton skeleton-row"></div></td></tr>'
+  ).join('');
+}
+
+/* ── Sort Handler ──────────────────────────────────────────────────────── */
+document.getElementById('table-head').addEventListener('click', e => {
+  const th = e.target.closest('th');
+  if (!th || !th.dataset.key) return;
+
+  const key = th.dataset.key;
+  if (state.sortKey === key) {
+    state.sortAsc = !state.sortAsc;
+  } else {
+    state.sortKey = key;
+    // Default sort direction: rank asc, scores desc, return desc, vol asc, dd asc, momentum desc
+    const descByDefault = ['normalized_score', 'annualized_return', 'momentum'];
+    state.sortAsc = !descByDefault.includes(key);
+  }
+  renderTable();
+});
+
+/* ── Detail Panel ──────────────────────────────────────────────────────── */
+async function openDetail(ticker) {
+  state.selectedTicker = ticker;
+
+  const panel = document.getElementById('detail-panel');
+  const backdrop = document.getElementById('panel-backdrop');
+
+  document.getElementById('panel-ticker').textContent = ticker;
+  document.getElementById('panel-metrics').innerHTML =
+    '<div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div>';
+  document.getElementById('panel-scores-list').innerHTML =
+    '<h3>Profile Details</h3><div class="skeleton skeleton-row"></div>';
+
+  panel.classList.add('open');
+  backdrop.classList.add('open');
+
+  try {
+    const data = await api.stock(ticker);
+    renderDetailMetrics(data);
+    renderDetailChart(data);
+    renderDetailScores(data);
+  } catch (err) {
+    document.getElementById('panel-metrics').innerHTML =
+      `<div style="grid-column:1/-1;color:var(--red);padding:1rem">Error loading ${ticker}: ${err.message}</div>`;
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('panel-backdrop').classList.remove('open');
+  state.selectedTicker = null;
+  if (state.chartInstance) {
+    state.chartInstance.destroy();
+    state.chartInstance = null;
+  }
+}
+
+document.getElementById('panel-close').addEventListener('click', closeDetail);
+document.getElementById('panel-backdrop').addEventListener('click', closeDetail);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetail();
+});
+
+function renderDetailMetrics(data) {
+  const m = data.metrics && data.metrics.length > 0 ? data.metrics[0] : null;
+  const container = document.getElementById('panel-metrics');
+
+  if (!m) {
+    container.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted)">No metrics available</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="panel-metric">
+      <div class="pm-label">Annualized Return</div>
+      <div class="pm-value ${colorClass(m.annualized_return)}">${fmtPct(m.annualized_return)}</div>
+    </div>
+    <div class="panel-metric">
+      <div class="pm-label">Volatility</div>
+      <div class="pm-value">${(m.volatility * 100).toFixed(1)}%</div>
+    </div>
+    <div class="panel-metric">
+      <div class="pm-label">Max Drawdown</div>
+      <div class="pm-value text-red">${fmtPct(m.max_drawdown)}</div>
+    </div>
+    <div class="panel-metric">
+      <div class="pm-label">Momentum</div>
+      <div class="pm-value ${colorClass(m.momentum)}">${fmtPct(m.momentum)}</div>
+    </div>
+    <div class="panel-metric">
+      <div class="pm-label">Downside Dev</div>
+      <div class="pm-value">${(m.downside_deviation * 100).toFixed(2)}%</div>
+    </div>
+    <div class="panel-metric">
+      <div class="pm-label">Trading Days</div>
+      <div class="pm-value">${m.trading_days}</div>
+    </div>`;
+}
+
+function renderDetailChart(data) {
+  if (state.chartInstance) {
+    state.chartInstance.destroy();
+    state.chartInstance = null;
+  }
+
+  const scores = data.scores || [];
+  if (scores.length === 0) return;
+
+  const labels = scores.map(s => s.risk_profile.charAt(0).toUpperCase() + s.risk_profile.slice(1));
+  const values = scores.map(s => s.normalized_score);
+  const colors = scores.map(s => {
+    const c = profileColor(s.risk_profile);
+    return c.startsWith('var(') ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4, -1).trim()) : c;
+  });
+
+  const ctx = document.getElementById('score-chart').getContext('2d');
+  state.chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.map(c => c + '33'),
+        borderColor: colors,
+        borderWidth: 2,
+        borderRadius: 4,
+        barPercentage: 0.6,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e2a3a',
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          borderColor: '#374151',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            label: ctx => 'Score: ' + ctx.parsed.x.toFixed(3),
+          },
+        },
+      },
+      scales: {
+        x: {
+          min: 0,
+          max: 1,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            color: '#64748b',
+            font: { family: "'JetBrains Mono', monospace", size: 11 },
+          },
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: '#94a3b8',
+            font: { family: "'DM Sans', sans-serif", size: 12, weight: 600 },
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderDetailScores(data) {
+  const container = document.getElementById('panel-scores-list');
+  const scores = data.scores || [];
+
+  container.innerHTML = '<h3>Profile Details</h3>' + scores.map(s => `
+    <div class="score-row">
+      <span class="sr-profile" style="color:${profileColor(s.risk_profile)}">${s.risk_profile}</span>
+      <div class="sr-values">
+        <span class="${colorClass(s.normalized_score)}">${fmtScore(s.normalized_score)}</span>
+        <span class="sr-rank">#${s.rank}</span>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Data Loading ──────────────────────────────────────────────────────── */
+async function loadRankings() {
+  renderTableSkeleton();
+  try {
+    state.rankings = await api.rankings(state.activeProfile);
+    renderTable();
+    renderStats();
+  } catch (err) {
+    document.getElementById('table-body').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--red)">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function init() {
+  try {
+    const [healthData, profilesData] = await Promise.all([
+      api.health(),
+      api.profiles(),
+    ]);
+
+    state.health = healthData;
+    state.profiles = profilesData.profiles;
+
+    renderDate();
+    renderProfiles();
+    renderStats();
+
+    await loadRankings();
+  } catch (err) {
+    document.getElementById('data-date').textContent = 'Error connecting to API';
+    console.error('Init error:', err);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
